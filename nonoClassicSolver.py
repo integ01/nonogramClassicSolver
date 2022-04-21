@@ -303,15 +303,24 @@ def getSubLineDist(match, lineState): #, minIdx):
     return (low, hi, lineDist)
 
 def findHiLowRange(lineState,low , hi):
+    plow = low+1
+    phi = hi
     while (low >0 and lineState[low]==9):
         low -= 1
-    if lineState[low] == 1 or lineState[low] == 0:
-        low +=1 
+    #if lineState[low] == 1 or lineState[low] == 0:
+    #    low +=1 
     low = max(0, low)        
+   
+    if  lineState[low] == 0:
+        low +=1 
+    elif lineState[low] == 1 :
+        low +=2
+    low = min(plow,low)
     while (hi < len(lineState) and lineState[hi]==9):
         hi += 1
     if hi < len(lineState) and lineState[hi] == 1:
-        hi -=1
+        hi = max(phi,hi-1)
+    
     hi = min(hi,len(lineState))
     return low, hi
     
@@ -327,12 +336,79 @@ def getLineDistMatch(qParams, mRanges, lsize):
             move = qrange[1]
             start = qrange[0]
             prob = 1./(move+1.)
-            if (start <= x) and (x < start+qparam+move):              
-                distM[idx,x] += prob * min(min(x-start+1,move+1) , start+qparam+move - x)
+            if (start <= x) and (x < start+qparam+move+1):              
+                #fact=min(min(x-start+1,qparam) , start+qparam+move- x)
+                #print("x={}, fact:{}".format(x,fact))
+                distM[idx,x] += prob * min(min(min(x-start+1,qparam),move+1) , start+qparam+move- x)
+        #print("x={},dist:{}".format(x,distM[:,x]))
+    gidx = 0
+    gstart = mRanges[0][0]
+    gmove =mRanges[0][1]
+    lastParam = qParams[0]
+    
+    for idx, (qparam, qrange) in enumerate(zip(qParams[1:],mRanges[1:])):
+      move = qrange[1]
+      start = qrange[0] 
+      if gmove == move and start == gstart+  lastParam+1:
+            distM[idx,:] += distM[idx-1,:]
+            distM[idx-1,:] = 0
     dist = np.max(distM,axis=0)
-
     return dist
     
+def getLineDistMatch2( qParams, mRanges, lsize):
+       if len(qParams) == 0:
+             return np.array([])
+#   Min Sum = number of  '1' + number of spaces between
+       sumT = sum(qParams) + (len(qParams) -1)
+       if (sumT == 0):
+         return np.zeros([lsize])
+       distM = np.zeros([len(qParams),lsize])
+       basic_loc=[0]
+       for idx, (qparam, qrange) in enumerate(zip(qParams,mRanges)):
+            move = qrange[1]
+            start = qrange[0]
+            prob = 1./(move+1.)
+            for shift in range(move+1):  
+ #                assert(start>=0)
+ #                assert(qparam>0)              
+ #                if (start+qparam+shift >= lsize):
+ #                     print(qparams)
+ #                     print (qparam,start,shift)
+ #                     print(lsize)
+ #                     print(dist)
+                 assert(start+qparam+shift <= lsize)
+                 distM[idx,start+shift:start+qparam+shift] += np.full(qparam,prob)
+       gidx = 0
+       gstart = mRanges[0][0]
+       gmove =mRanges[0][1]
+       lastParam = qParams[0]
+    
+       for idx, (qparam, qrange) in enumerate(zip(qParams[1:],mRanges[1:])):
+         move = qrange[1]
+         start = qrange[0] 
+         if gmove == move and start == gstart+  lastParam+1:
+            distM[idx,:] += distM[idx-1,:]
+            distM[idx-1,:] = 0
+       dist = np.max(distM,axis=0)
+         
+       return dist
+
+def compareLineDist(dist1, dist2):
+    lsize = 30
+    diff = []
+    for i in range(lsize):
+       if abs (dist1[i] - dist2[i])> 1e-4:
+           diff += [i]
+    if len(diff)>0:
+       print ("<<Unequal distributions:>>")
+       print ("unequal idexes:"+str(diff))
+       print (dist1)
+       print ("----<><>---")
+       print(dist2)
+       print ("<</Unequal distributions:/>>")
+       #pdb.set_trace()
+
+
 def getSubLineDist3(matchl, lineState,gQParam): #, minIdx):
     global fqz
 
@@ -353,12 +429,14 @@ def getSubLineDist3(matchl, lineState,gQParam): #, minIdx):
 
         if match.mask != '': # had a mask
             low,hi = findHiLowRange(lineState, match.start-1, match.end)
+            print ("Partial Match: hi:{0}, low:{1}, move:{2}".format(hi,low, move)             )
             low = max (low, nextLow)
             low = max(low , match.start-(match.size-blkLen))
             hi = min(hi, match.end + (match.size-blkLen))
             move = hi-low - match.size
             #if (hi-low <0 or move < 0):
             #    print ("Error: hi:{0}, low:{1}, move:{2}".format(hi,low, move)             )
+            print ("Partial Match2: hi:{0}, low:{1}, move:{2}".format(hi,low, move)             )
             matchRanges.append((low,move))
             qParaml.append(match.size)
             nextLow = match.end + 1
@@ -377,8 +455,11 @@ def getSubLineDist3(matchl, lineState,gQParam): #, minIdx):
                 paramSum += (matchl[i].size +1)
                 i+=1
             
-            
             move = hi-low - paramSum +1
+            print("hi,low:",hi,low)
+            print("paramSum:",paramSum)
+            print("move:",move)
+            
             for ii in range(len(matchRanges)):
                 if matchRanges[ii][1] == -1:
                     matchRanges[ii] = (matchRanges[ii][0],move)
@@ -397,7 +478,10 @@ def getSubLineDist3(matchl, lineState,gQParam): #, minIdx):
         #lineDist = fqz.getLineDist(qParam, hi-low)
     print (qParaml)
     print (matchRanges)
+    #lineDist2 = getLineDistMatch2(qParaml,matchRanges, len(lineState))
     lineDist = getLineDistMatch(qParaml,matchRanges, len(lineState))
+
+    #compareLineDist(lineDist, lineDist2)
 
     return lineDist
  
@@ -490,7 +574,7 @@ def scanAxisDist(pzl, rowOrCol):
         for matchl in matchsL[lineIdx]:
             resMatchGrp += findMinIdZones(matchl, lineState)
         #self.c_match[c] = res
-        NonoMatch.printMatchList(resMatchGrp)
+        #NonoMatch.printMatchList(resMatchGrp)
         zones =[]
         matchTrim = []
         for match in resMatchGrp:
@@ -631,7 +715,9 @@ def markBlanksInFullLines(pzl, rowOrCol):
 
     ##########################################################################
     #
-    #    Solve - Iterative algorithm for filling Nonogram puzzle
+    #                        function Solve
+    #              Iterative algorithm for filling Nonogram puzzle
+    #  Input: class puzzleState.
     #
     ##########################################################################
 def solve(pzl):
@@ -640,11 +726,9 @@ def solve(pzl):
 
     count = 0
     while (not pzl.done() and change != 0):
-        if (count == 4):
-            print("")
         change = 0
         ########## Match columns/rows to quiz line parametes #########
-        #         and generate possible match ombinations            
+        #         and generate possible match combinations            
         print ("========Matched Marked rows/cols to Params (All combinations) ===========")
         pzl.c_match = matchStateToQuizParams( pzl, RowCol.COL)
         pzl.r_match = matchStateToQuizParams( pzl, RowCol.ROW)
@@ -674,10 +758,10 @@ def solve(pzl):
         pzl.printState()
         pzl.iterateStep()
 
-        
-
-
-def britStart(pzl):
+#########################        
+# britStartHints - an example of setting start marking hints
+#
+def britStartHints(pzl):
     listStates = [ (3,3), (4,3), (12,3), (13,3), (21,3), \
                  (6,8), (7,8), (10,8), (14,8), (15,8),(18,8),\
                   (6,16) , (11,16), (11,16), (16,16), (20,16),\
@@ -685,31 +769,28 @@ def britStart(pzl):
     for c,r in listStates:
         pzl.updateState(c,r,1)
 
+############################################################
+#                            main
+# argument - input file (csv), see example file for format
+#
+############################################################
 def main(argv):
     global fqz
     global QFILE
-    inputfile = None
+
+    inputfile = QFILE
     if len(argv) > 0:
         inputfile = argv[0]
-    if inputfile is None:
-        inputfile = QFILE
     print ('Input file is '+ inputfile)
 
-    #outputfile = argv[1]
-    # path = '/home/integ/Desktop/Data/nonoGram/'
-    #print ('Path is '+ path)
-
-
-    #fqz = QuizLoad2Dist()
-    #hlist, vlist = fqz.readQuizFile(inputfile )
     hlist, vlist = NonoMatch.readQuizFile(inputfile)
     print (hlist)
     print (vlist)
     y_size = len(hlist)
     x_size = len(vlist)
 
-    pzl = puzzleState(hlist, vlist)
-    #britStart(pzl)
+    pzl = puzzleState(hlist, vlist)  # initialize the puzzle state
+    #britStartHints(pzl)   #an example of setting start markings.
     pzl.printState()
 
     solve(pzl)
