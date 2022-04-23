@@ -2,7 +2,7 @@ import pdb
 import csv
 
 PUZ_DIMY = 0
-
+Debug = False
 
 def readQuizFile(name):     
     flag = 0
@@ -44,22 +44,31 @@ class Match:
         else:
             #print("#{0}, block:{1}, rangeIdx:{2}-{3}".format(self.idx, self.size, self.start, self.end-1))
             return "{0}_qblk:{1}@{2}:{3}({4})".format(self.idx, self.size, self.start, ''.join(self.mask),of)
-    
-       
-
-#def assert1(assertTrue, msg):
-#    if assertTrue == False:
-#        print ("Assertion failed: "+ msg)
-#    return
 
 
 
 
-              
+def find_blanks(m):
+    return [ i+m.start for i in range(len(m.mask)) if m.mask[i] == '_']
 
-#def matchQ2Blocks(qParam, blockLine):
-#    comb = getCombination(qParam, blockLine)
-#    print (comb)
+def printd(s):
+  global Debug
+  if Debug:
+     print(s)
+
+def printMatchList(retlist):
+    if retlist == []:
+        print("[[]]")
+    for matches in retlist: #combPruneList:
+    #    print("============")
+        #print (type(matches))
+        res = ">"
+        for match in matches:
+            res += match.print_fields()
+            res += ", "
+        #for match in matches:
+        #    match.print_fields()
+        print (res)
 
 def Conj(ml1, ml2):
     res = []
@@ -99,25 +108,7 @@ def getBlocks(line):
                 found = False
     return res
 
-def getFreeZones(line):
-    found = False;
-    res = []
-    cur_bidx = -1
-    prev_i = 9
-    for i in range(len(line)):
-        if not found:
-            if line[i] == 9 and prev_i != 1:
-                res.append((i,1))
-                cur_bidx += 1 # = len(res) -1
-                
-                found = True
-        else:
-            if line[i] == 9:
-                res[cur_bidx] = (res[cur_bidx][0],res[cur_bidx][1]+1)
-            else:
-                found = False
-        prev_i = line[i]
-    return res
+
 
 def mergeMasks(blockMasks):
     mask = []
@@ -138,6 +129,105 @@ def mergeMasks(blockMasks):
     return (startIdx,endIdx-startIdx, mask)
 
 
+##########################################################################
+#  function getFreeZones: Find locations of non-marked grid spaces.
+#  Inputs:
+#    line - puzzle line pixels.
+#  Return:
+#    list of tuples with free locations [(startIdx,endIdx)]
+##########################################################################
+def getFreeZones(line):
+    found = False;
+    res = []
+    cur_bidx = -1
+    prev_i = 9
+    for i in range(len(line)):
+        if not found:
+            if line[i] == 9 and prev_i != 1:
+                res.append((i,1))
+                cur_bidx += 1 # = len(res) -1
+                
+                found = True
+        else:
+            if line[i] == 9:
+                res[cur_bidx] = (res[cur_bidx][0],res[cur_bidx][1]+1)
+            else:
+                found = False
+        prev_i = line[i]
+    return res
+
+##########################################################################
+#  function genCombEmptyZonesRec: Using match list to generate possible 
+#  placements for all 'empty' matches using the empty zones in the grid.
+#  Inputs:
+#    matchl - list of list of line matches, data type:'class Match'.
+#    imatch   - current match list idx in the match list.
+#    freeZoneIdxs, tuples (startIdx, endIdx) - list of empty zones of the line, 
+#    minPos - current line position index to check.
+#    res - intermediate recursion result.
+#  Return:
+#    matchl - Update list of list of line matches, data type:'class Match'.  
+##########################################################################
+def genCombEmptyZonesRec(matchl, imatch, freeZoneIdxs, minPos, res):
+
+    if imatch >= len(matchl):
+        assert(len(res)==len(matchl))
+        return [res]
+    elif matchl[imatch].mask != "":#(imatch <= len(matchl)) and 
+        if matchl[imatch].start >= minPos :
+            next = res[:]
+            next.append(matchl[imatch])
+            minPos = matchl[imatch].end +1
+            ret = genCombEmptyZonesRec(matchl, imatch+1, freeZoneIdxs, minPos, next)
+            if (imatch == 0): 
+               for r in ret:
+                 assert(len(r)==len(matchl))
+
+            return ret
+        else:
+            printd ("jumping case, free zone space {0} > block matchs:{1}".format(\
+          minPos, matchl[imatch].start ))
+            return []
+    elif freeZoneIdxs == []: #if match.mask == "":
+        if len(matchl) >0:
+            printd ("jumping case, no free zone space left for empty block" + matchl[imatch].print_fields() )
+        else:
+            printd ("jumping case, no free zone space left for empty block and empty matchs" )
+        return []
+    else:
+        match = matchl[imatch] 
+        retList = []
+
+        fidx =0
+  
+        for zone in freeZoneIdxs:
+            zoneLen = zone[1]
+            zoneStartPos = zone[0]
+            match = matchl[imatch]
+            if True:
+                if minPos > zoneStartPos+zoneLen:
+                    printd ("Skip: Min index {0} >  end of freezone: {1}".format(minPos,zoneStartPos+ zoneLen))
+                    continue
+                startPos  = max (minPos, zoneStartPos)
+                if startPos + match.size > zoneStartPos + zoneLen:
+                    printd ("Skip: free len: {0} < match size: {1}".format(zoneLen,match.size))
+                    continue
+
+                newMatch = Match(idx = imatch, size=match.size, start=startPos, \
+                                   end= startPos+ match.size, mask="", full=False)
+                next = res[:]
+                next.append(newMatch)
+                minPosNext = startPos + match.size +1
+                if (zoneStartPos+zoneLen > minPosNext):
+                    ret = genCombEmptyZonesRec(matchl, imatch+1, freeZoneIdxs, minPosNext, next)
+                else:
+                    ret = genCombEmptyZonesRec(matchl, imatch+1, freeZoneIdxs[1:], minPosNext, next)          
+                retList += ret  
+                if (imatch == 0) and len(ret)>0:
+                 for r in ret:
+                   assert(len(r)==len(matchl))
+
+        return retList
 
 def genSubGroupsRec(blockMasks, l,res):
     if l == 1:
@@ -170,13 +260,19 @@ def genSubGroups(blockIdxs, leng):
 
 
 
-'''
-genCombRec5()
- qParam -list to quiz input
- pidx - index of sub list to find combinations.
- blockIdxs - list of tuples of discovered blocks - (startIdx,size,MaskOfBlock)
- res - Recursive result
-'''
+
+##########################################################################
+#  function genCombRec5: Using parameter list to generate possible 
+#  matches with grid 'markings'.
+#  Inputs:
+#    qParam -list to quiz input
+#    pidx - index of sub list to find combinations.
+#    blockIdxs - list of tuples of discovered blocks - (startIdx,size,MaskOfBlock)
+#    minIdx - current minimum line pixel index.
+#    res - intermediate recursion result.
+#  Return:
+#    matchl - Update list of list of line matches, data type:'class Match'.  
+##########################################################################
 def genCombRec5(qParam,pidx,blockIdxs,minIdx, res):
     global PUZ_DIMY
     #pdb.set_trace()
@@ -187,7 +283,7 @@ def genCombRec5(qParam,pidx,blockIdxs,minIdx, res):
         minIdx -= 1
 
         if (minIdx > PUZ_DIMY):
-            print ("jumping case minimum end index:({0}) > max index:{1}".format(minIdx,PUZ_DIMY ))
+            printd ("jumping case minimum end index:({0}) > max index:{1}".format(minIdx,PUZ_DIMY ))
             return []
         #print (type(matches))
         out = ""
@@ -217,24 +313,6 @@ def genCombRec5(qParam,pidx,blockIdxs,minIdx, res):
             retList += ret
         return retList
 
-def find_blanks(m):
-    return [ i+m.start for i in range(len(m.mask)) if m.mask[i] == '_']
-
-
-def printMatchList(retlist):
-    if retlist == []:
-        print("[[]]")
-    for matches in retlist: #combPruneList:
-    #    print("============")
-        #print (type(matches))
-        res = ">"
-        for match in matches:
-            res += match.print_fields()
-            res += ", "
-        #for match in matches:
-        #    match.print_fields()
-        print (res)
-
 def genMatches(qParam,lineState):
     global PUZ_DIMY
     #global combList
@@ -242,10 +320,10 @@ def genMatches(qParam,lineState):
     PUZ_DIMY = len(lineState)
 
     #for i in range(1): #//len(Test_lineStates)):
-    print ("Print In:")
-    print (qParam)
+    printd ("Print In:")
+    printd (qParam)
     #lineState = Test_lineStates[1]
-    print (lineState)
+    printd (lineState)
     
     
     blockIdxs = getBlocks(lineState)

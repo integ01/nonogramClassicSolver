@@ -10,26 +10,28 @@
 #  
 
 import nonoLineMatchesLib as NonoMatch
+from nonoLineMatchesLib import printd
 import numpy as np
 import sys
 from enum import Enum   
 import pdb
-fqz = None
 
 
-QFILE = "nonoQuiz-big-bug.csv"
+QFILE = "nonoQuiz-big-bug.csv" #Input Quiz file
 
 DELTA = 0.01
-change = -1
-count = 0
+change = -1 #Number of changes to grid pixels.
+count = 0 #Number of iterations
 
-interFlag = False
-
+waitOnStep = True
+Debug = False
 
 class RowCol(Enum):
         ROW = 1
         COL = 4
 
+
+      
 ################### class puzzleState ##########################
 
 class puzzleState():
@@ -40,8 +42,6 @@ class puzzleState():
         self.r_size = len(hlist)
         self.c_match = {}
         self.r_match = {}
-        #'_', '_', '_', '_', '_', '_', '_', '_','_', '_']
-        #column_empty = dict{ i: '_' for i in range self.c_size}
         self.state = {}
         for i in range (self.c_size):
             self.state[i] = [9]*self.r_size
@@ -74,7 +74,6 @@ class puzzleState():
                         linestr += field+","
                     else:
                         linestr += field+" ,"
-#                linestr += str("{0}, ".format(vitem[0]))
                     vlist[vidx].pop(0)
                 else:
                     linestr += " , "
@@ -96,7 +95,6 @@ class puzzleState():
                     nchr = "."
                 else:
                     nchr = "_"
-                #linestr += "{0}, ".format(self.state[c][j])
                 linestr += nchr+"  "
             print(linestr)
 
@@ -107,7 +105,7 @@ class puzzleState():
             lineState = [ self.state[i][r] for r in range(self.r_size)]
             self.c_match[i] = [[NonoMatch.Match(idx = j, size = qParam[j], start=-1, end= -1, mask="", full=False) \
                             for j in range(len(qParam)) ]]
-            print (qParam)
+            printd (qParam)
 
         for i in range (self.r_size):
             qParam = self.hlist[i]
@@ -115,7 +113,7 @@ class puzzleState():
             self.r_match[i] = [[NonoMatch.Match(idx = j, size = qParam[j], start=-1, end= -1, mask="", full=False) \
                             for j in range(len(qParam)) ]]
 
-        print (qParam)
+        printd (qParam)
 
     def done(self):
         for c in range(self.c_size):
@@ -131,21 +129,25 @@ class puzzleState():
             if val != 9:
                 change += 1
         elif self.state[c][r] != val:
-            print("Dist Error: trying to change Row:{0} Col:{1} from {2} to {3} ".format(r,c, 1-val,val))                   
+            printd("Dist Error: trying to change Row:{0} Col:{1} from {2} to {3} ".format(r,c, 1-val,val))                   
 
     
-
+    def getLineState(self, idx, rowOrCol):
+        if rowOrCol == RowCol.ROW:
+            return [ self.state[c][idx] for c in range(self.c_size)]
+        else:
+            return [ self.state[idx][r] for r in range(self.r_size)]            
 
     def iterateStep(self):
-        global interFlag
+        global waitOnStep
         global change
         global count
 
         count +=1
         print ("iteration#{0}: changes:{1}".format(count,change))
-        if count %1 == 0 and interFlag:
+        if count %1 == 0 and waitOnStep:
             input("Press any key")
-        if change == 0 and interFlag:
+        if change == 0 and waitOnStep:
             e = input("edit?")
             if e in "Yy":
                 try: 
@@ -156,7 +158,7 @@ class puzzleState():
                     self.updateState(c1,r1,1)
                     change =1
                 except:
-                    print("wrong input")
+                    printd("wrong input")
 
 ###################End of class puzzleState ##########################
 
@@ -165,163 +167,27 @@ class puzzleState():
 
 
 
-def genCombEmptyZonesRec(matchl, midx, freeZoneIdxs, minIdx, res):
-
-    if midx >= len(matchl):
-        return [res]
-    elif matchl[midx].mask != "":#(midx <= len(matchl)) and 
-        if matchl[midx].start >= minIdx :
-            next = res[:]
-            next.append(matchl[midx])
-            minIdx = matchl[midx].end +1
-            ret = genCombEmptyZonesRec(matchl, midx+1, freeZoneIdxs, minIdx, next)
-            return ret
-        else:
-            print ("jumping case, free zone space {0} > block matchs:{1}".format(\
-          minIdx, matchl[midx].start ))
-            return []
-    elif freeZoneIdxs == []: #if match.mask == "":
-        if len(matchl) >0:
-            print ("jumping case, no free zone space left for empty block" + matchl[midx].print_fields() )
-        else:
-            print ("jumping case, no free zone space left for empty block and empty matchs" )
-        return []
-    else:
-        match = matchl[midx] 
-        retList = []
-
-        fidx =0
-  
-        for zone in freeZoneIdxs:
-            blkLen = zone[1]
-            blkStartIdx = zone[0]
-            match = matchl[midx]
-            if True:
-                if minIdx > blkStartIdx+blkLen:
-                    print ("Skip: Min index {0} >  end of freezone: {1}".format(minIdx,blkStartIdx+ blkLen))
-                    continue
-                startIdx  = max (minIdx, blkStartIdx)
-                if startIdx + match.size > blkLen + blkStartIdx:
-                    print ("Skip: free len: {0} < match size: {1}".format(blkLen,match.size))
-                    continue
-
-                newMatch = NonoMatch.Match(idx = midx, size=match.size, start=startIdx, \
-                                   end= startIdx+ match.size, mask="", full=False)
-                next = res[:]
-                next.append(newMatch)
-                minIdxNext = startIdx + match.size +1
-                if (blkStartIdx+blkLen > minIdxNext):
-                    ret = genCombEmptyZonesRec(matchl, midx+1, freeZoneIdxs, minIdxNext, next)
-                else:
-                    ret = genCombEmptyZonesRec(matchl, midx+1, freeZoneIdxs[1:], minIdxNext, next)          
-                retList += ret  
-        return retList
-
-
-def findMinIdZones(matchl, lineState):
-
-    freeZonesIdxs = NonoMatch.getFreeZones(lineState)
-    zoneIdx = 0
-    emptyMatch =[]
-
-    selcomb = genCombEmptyZonesRec(matchl,0,freeZonesIdxs,0, [])
-    #for combItm in selcomb:
-        # print ("==============")
-        #for item in combItm:
-        #  print(item.print_fields())
-    return selcomb
-
-
-
-
-def findMinIdx(matchl, lineState):
-    idx = 0
-    startIdx = 0
-    minRes = []
-    while (len(matchl) > idx):
-        match = matchl[idx]
-        if match.mask == "":
-            startIdx = max(match.start, startIdx)
-            minIdx = startIdx
-            while minIdx < len(lineState) and minIdx-startIdx < match.size and \
-            lineState[minIdx] == 9:   minIdx += 1
-            if (minIdx-startIdx != match.size):
-                minIdx +=1
-                startIdx = minIdx
-            else:
-                if ( lineState[minIdx] != 1):
-                    match.start = startIdx
-                    match.end = minIdx
-                    minRes.append(minIdx)
-                    startIdx = minIdx+1
-                    idx +=1
-        else:
-            minRes.append( match.end)
-            startIdx = match.end+1
-            idx += 1
-    return minRes, matchl
-
-
-
-def getSubLineDist(match, lineState): #, minIdx):
-    global fqz
-    low = match[0].start-1
-    while (low >0 and lineState[low]==9):
-        low -= 1
-    if lineState[low] == 1 or lineState[low] == 0:
-        low +=1
-
-
-    blkLen = match[0].end - match[0].start
-
-    low = max(0, low)
-    if (match[0].mask!= ''): 
-        low = max(low, match[0].start-(match[0].size-blkLen))
-
-    #low = max(minIdx, low)
-
-    blkLen2 = match[-1].end - match[-1].start
-    hi = match[-1].end
-    while (hi < len(lineState) and lineState[hi]==9):
-        hi += 1
-    if hi < len(lineState) and lineState[hi] == 1:
-        hi -=1
-    hi = min(hi,len(lineState))
-    if (match[-1].mask!= ''): 
-        hi = min(hi, match[-1].end + (match[-1].size-blkLen2))
-
-    qParam = [match[i].size for i in range(len(match))]
-    #subLineState = lineState[low:hi]
-    if (hi-low <0):
-        print ("Error")
-    if sum(qParam) + len(qParam) -1 > hi -low:
-        print ("Case Over fit: ")
-        NonoMatch.printMatchList([match])
-        print (" {0} in between: {1}--{2} ".format(qParam,low,hi))
-        return (low, hi, [])  
-    lineDist = fqz.getLineDist(qParam, hi-low)
-    return (low, hi, lineDist)
-
 def findHiLowRange(lineState,low , hi):
     plow = low+1
     phi = hi
     while (low >0 and lineState[low]==9):
         low -= 1
-    #if lineState[low] == 1 or lineState[low] == 0:
-    #    low +=1 
     low = max(0, low)        
-   
     if  lineState[low] == 0:
         low +=1 
     elif lineState[low] == 1 :
         low +=2
     low = min(plow,low)
+
+
     while (hi < len(lineState) and lineState[hi]==9):
         hi += 1
+
     if hi < len(lineState) and lineState[hi] == 1:
         hi = max(phi,hi-1)
     
     hi = min(hi,len(lineState))
+
     return low, hi
     
 def getLineDistMatch(qParams, mRanges, lsize):
@@ -409,9 +275,8 @@ def compareLineDist(dist1, dist2):
        #pdb.set_trace()
 
 
-def getSubLineDist3(matchl, lineState,gQParam): #, minIdx):
-    global fqz
-
+def getLineDist(matchl, lineState,gQParam): #, minIdx):
+    
     matchRanges = []
     matchBlock = []
     qParaml = []
@@ -429,14 +294,12 @@ def getSubLineDist3(matchl, lineState,gQParam): #, minIdx):
 
         if match.mask != '': # had a mask
             low,hi = findHiLowRange(lineState, match.start-1, match.end)
-            print ("Partial Match: hi:{0}, low:{1}, move:{2}".format(hi,low, move)             )
             low = max (low, nextLow)
             low = max(low , match.start-(match.size-blkLen))
             hi = min(hi, match.end + (match.size-blkLen))
             move = hi-low - match.size
-            #if (hi-low <0 or move < 0):
-            #    print ("Error: hi:{0}, low:{1}, move:{2}".format(hi,low, move)             )
-            print ("Partial Match2: hi:{0}, low:{1}, move:{2}".format(hi,low, move)             )
+            if (hi-low <0 or move < 0):
+                printd ("Error: hi:{0}, low:{1}, move:{2}".format(hi,low, move)             )
             matchRanges.append((low,move))
             qParaml.append(match.size)
             nextLow = match.end + 1
@@ -456,9 +319,9 @@ def getSubLineDist3(matchl, lineState,gQParam): #, minIdx):
                 i+=1
             
             move = hi-low - paramSum +1
-            print("hi,low:",hi,low)
-            print("paramSum:",paramSum)
-            print("move:",move)
+            printd("hi,low:{},{}".format(hi,low))
+            printd("paramSum:" + str(paramSum))
+            printd("move:"+ str(move))
             
             for ii in range(len(matchRanges)):
                 if matchRanges[ii][1] == -1:
@@ -467,20 +330,18 @@ def getSubLineDist3(matchl, lineState,gQParam): #, minIdx):
             nextLow = low +paramSum
          
         if (hi-low <0):
-            print ("Error")      
+            printd ("Error")      
         if (move<0):
-            print ("Case Over fit: ")
-            NonoMatch.printMatchList([matchl])
-            print ("Q param {0} in between: {1}--{2} ".format(qParaml,low,hi))
+            printd ("Case Over fit: ")
+            if Debug: NonoMatch.printMatchList([matchl])
+            printd ("Q param {0} in between: {1}--{2} ".format(qParaml,low,hi))
             return []
     
-
-        #lineDist = fqz.getLineDist(qParam, hi-low)
-    print (qParaml)
-    print (matchRanges)
-    #lineDist2 = getLineDistMatch2(qParaml,matchRanges, len(lineState))
+    printd (qParaml)
+    printd (matchRanges)
+    
     lineDist = getLineDistMatch(qParaml,matchRanges, len(lineState))
-
+    #lineDist2 = getLineDistMatch2(qParaml,matchRanges, len(lineState))
     #compareLineDist(lineDist, lineDist2)
 
     return lineDist
@@ -506,7 +367,7 @@ def emptyMarkFullEdgesLines(match, listState):
                     resState[m.end] =0            
             else : fullLine = False
         if fullLine :
-            print( "Line full match")
+            printd( "Line full match")
             for j in range (len(listState)):
                 if resState[j] != 1: 
                     resState[j] = 0 
@@ -514,27 +375,27 @@ def emptyMarkFullEdgesLines(match, listState):
 
 
 
-def getLineState(pzl, idx, rowOrCol):
-        if rowOrCol == RowCol.ROW:
-            return [ pzl.state[c][idx] for c in range(pzl.c_size)]
-        else:
-            return [ pzl.state[idx][r] for r in range(pzl.r_size)]            
 
-##################################################
-## Match Row/columns To Quiz Parameters.
-###################################################
+
+##########################################################
+# function matchStateToQuizParams() - Match lines (columns or rows) markings 
+# to quiz line parametes and generate match combinations.
+# Input: pzl - class puzzleState, 
+#        rowOrCol, 'class RowCol(Enum)' - match all rows or columns lines.
+# Return: 
+#        matchl - list of list of line matches, data type:'class Match'.
+#########################################################
 def matchStateToQuizParams(pzl, rowOrCol):
         
         size = pzl.r_size if rowOrCol == RowCol.ROW else pzl.c_size
         qParamL = pzl.hlist if rowOrCol == RowCol.ROW else pzl.vlist
         matchsL = {}
         for i in range (size):
-            lineState = getLineState(pzl,i,rowOrCol)
-            print ("{0}-#:{1}".format(rowOrCol,i))
+            lineState = pzl.getLineState(i,rowOrCol)
+            printd ("{0}-#:{1}".format(rowOrCol,i))
             matchs = NonoMatch.genMatches(qParamL[i], lineState)
-            NonoMatch.printMatchList(matchs)
+            #NonoMatch.printMatchList(matchs)
             matchsL[i] = checkMatch(pzl,matchs, lineState)
-            #NonoMatch.printMatchList(matchsL[i])
         return matchsL
 
 
@@ -548,7 +409,7 @@ def checkMatch(pzl,matchDict, lineState):
 
             for bidx in  blank_indxs:
                 if lineState[bidx] == 0:
-                    print ("Found bad match - removing match, idx:{0}".format(bidx))
+                    printd ("Found bad match - removing match, idx:{0}".format(bidx))
                     cond = False
                     continue #TODO break??
                 else: 
@@ -558,50 +419,92 @@ def checkMatch(pzl,matchDict, lineState):
             res.append( matchl)
     return res
 
-
-def scanAxisDist(pzl, rowOrCol):        
+##########################################################
+# function fillEmptyMatchWithFreeZones() - 
+#  Fill in non-matched (empty) quiz parameters with 
+#  possible free zone placements and add to the match 
+#  combinations list.
+# Input: pzl - class puzzleState, 
+#        rowOrCol, 'class RowCol(Enum)' - match all rows or columns lines.
+#        matchsL - Current list of line matches placements, data type:'class Match'.
+# Return: 
+#        matchl - Updated list of line placements, data type:'class Match'.
+#########################################################
+def fillEmptyMatchWithFreeZones (pzl, rowOrCol, matchsL):
+        
     size = pzl.r_size if rowOrCol == RowCol.ROW else pzl.c_size
     qParamL = pzl.hlist if rowOrCol == RowCol.ROW else pzl.vlist
-    matchsL = pzl.r_match if rowOrCol == RowCol.ROW else pzl.c_match
+    #matchsL = pzl.r_match if rowOrCol == RowCol.ROW else pzl.c_match
+    resMatchs = {}
+    for lineIdx in range (size):
+        printd ("=================")
+        printd ("{0}-#:{1}".format(rowOrCol,lineIdx))
+        printd ("Qparam:{0}".format(qParamL[lineIdx]))
+        #if (rowOrCol == RowCol.ROW) and ((lineIdx ==28) or  (lineIdx ==29)):
+        #   pdb.set_trace()
+        lineState = pzl.getLineState(lineIdx,rowOrCol)
+        resMatchGrp = []
+        for matchl in matchsL[lineIdx]:
+          freeZonesIdxs = NonoMatch.getFreeZones(lineState)
+          resMatchGrp += NonoMatch.genCombEmptyZonesRec(matchl,0,freeZonesIdxs,0, [])
+        if Debug: NonoMatch.printMatchList(resMatchGrp)
+        resMatchs[lineIdx] = resMatchGrp
+    return  resMatchs
+
+
+
+##########################################################################
+#  function scanAxisDist:  Generate distributions rows/cols lines according
+#  to match placements,
+#    pzl - class puzzleState.
+#    rowOrCol - 'class RowCol(Enum)' - distributions for all rows or columns lines.
+#    matchsL - list of list of line matches, data type:'class Match'.
+#  Return:
+#    resDistL - Dictionary of line distributions, data type:Dictionary
+#########################################################################3
+def scanAxisDist(pzl, rowOrCol, matchsL):        
+    size = pzl.r_size if rowOrCol == RowCol.ROW else pzl.c_size
+    qParamL = pzl.hlist if rowOrCol == RowCol.ROW else pzl.vlist
+    #matchsL = pzl.r_match if rowOrCol == RowCol.ROW else pzl.c_match
     matchTrimL = {}
     resDistL = {}
     for lineIdx in range (size):
-        print ("=================")
-        print ("{0}-#:{1}".format(rowOrCol,lineIdx))
-        print("Qparam:{0}".format(qParamL[lineIdx]))
-        lineState = getLineState(pzl,lineIdx,rowOrCol)
-        resMatchGrp = []
-        for matchl in matchsL[lineIdx]:
-            resMatchGrp += findMinIdZones(matchl, lineState)
-        #self.c_match[c] = res
-        #NonoMatch.printMatchList(resMatchGrp)
+        printd ("=================")
+        printd ("{0}-#:{1}".format(rowOrCol,lineIdx))
+        printd("Qparam:{0}".format(qParamL[lineIdx]))
+        lineState = pzl.getLineState(lineIdx,rowOrCol)
+        resMatchGrp = matchsL[lineIdx]
         zones =[]
         matchTrim = []
         for match in resMatchGrp:
-            res = getSubLineDist3(match, lineState, qParamL[lineIdx])
+            res = getLineDist(match, lineState, qParamL[lineIdx])
             if len(res) == 0:
                 continue
             else:
                 matchTrim.append(match)
-                print (res)
-                print ("-------")
+                printd (res)
+                printd ("-------")
                 zones.append(res)
         resDistL[lineIdx] = zones
         matchTrimL[lineIdx] = matchTrim
-    return (matchTrimL, resDistL)
+    return resDistL
+
 
 def combDist(distl):
     global DELTA
-    siz = distl[0].shape
-    one = np.ones(siz)
-    zero = np.zeros(siz)
-    for dist in distl:
-        zero += dist
-        dist[dist< 1.0- DELTA] = 0.
-        one *= dist
-    one[one < 1. - DELTA] = 0.5
-    one[zero < 0.+ DELTA ] = 0.
-    return one
+    
+    distArr = np.array(distl)
+    dcount = distArr.shape[0]
+    dGridLen = distArr.shape[1]
+
+    sumLines = np.sum(distArr,axis=0)
+
+    combArr = np.ones(dGridLen)*0.5
+    combArr[sumLines < DELTA] = 0.
+    combArr[sumLines > dcount - dcount*DELTA] = 1.
+    
+    return combArr
+
 
 
 def getCommonConjMatch( matchDict):
@@ -630,7 +533,13 @@ def getCommonConjMatch( matchDict):
     else :
         return matchDict
 
- ######## Start Filling According to Distributions ########
+##########################################################################
+#  function fillByDistribution(): Start filling the puzzle grid with block Markings 
+#    according to line distributions
+#  Input: pzl - class puzzleState, 
+#         rowOrCol, data type:class RowCol(Enum)-  fill row or column lines.
+#         distD, data type:Dictionary of lists - list of grid probabilities.
+# 
 def fillByDistribution(pzl, rowOrCol, distD):
         
     size = pzl.r_size if rowOrCol == RowCol.ROW else pzl.c_size
@@ -655,13 +564,19 @@ def fillByDistribution(pzl, rowOrCol, distD):
             print("Line:{0} #{1} distribution empty".format(rowOrCol,l))           
 
 
-
-############# Start Filling According to Matches##############
-def fillByMatches(pzl, rowOrCol):               
+##########################################################################
+#  function fillByMatches(): Start filling the puzzle grid with block Markings 
+#    according to matches found.
+#  Input: pzl - class puzzleState, 
+#         rowOrCol, data type:class RowCol(Enum)-  scan row or column lines.
+#         matchsL, data type:class Match - list of line matches.
+# 
+###################################################
+def fillByMatches(pzl, rowOrCol, matchsL):               
     ## fill in Matched Blocks 
     # for col, match in enumerate(self.c_match):
     size = pzl.r_size if rowOrCol == RowCol.ROW else pzl.c_size
-    matchsL = pzl.r_match if rowOrCol == RowCol.ROW else pzl.c_match
+    #matchsL = pzl.r_match if rowOrCol == RowCol.ROW else pzl.c_match
     for lidx in range(size):
             match =  matchsL[lidx]
             if len(match) == 1:
@@ -674,38 +589,29 @@ def fillByMatches(pzl, rowOrCol):
                             pzl.updateState(bidx,lidx,1)                        
 
 
-def markBlanksInFullLines(pzl, rowOrCol):
-    print ("========Mark Blanks in Full rows/cols===========")
+def markBlanksInFullLines(pzl, rowOrCol,  matchsL):  
             ## Search full rows/cols and mark fulls
     size = pzl.r_size if rowOrCol == RowCol.ROW else pzl.c_size
     sizeCross = pzl.c_size if rowOrCol == RowCol.ROW else pzl.r_size
-    matchsL = pzl.r_match if rowOrCol == RowCol.ROW else pzl.c_match
+    #matchsL = pzl.r_match if rowOrCol == RowCol.ROW else pzl.c_match
     for lidx in range (size):
-            lineState = getLineState(pzl,lidx,rowOrCol)
+            lineState = pzl.getLineState(lidx,rowOrCol)
             ###Optimization - Get Common intersection of matches
-            if lidx == 16:
-                print ("")
-            #  matchs2 = self.getCommonConjMatch(self.c_match[c])
             matchs = matchsL[lidx]
             #matchs = self.getCommonConjMatch(self.c_match[c])
-            print("Col:{0}".format(lidx))
+            printd("Col:{0}".format(lidx))
             if len(matchs) > 1 :
-                NonoMatch.printMatchList(matchs)        
-                print ("Vs.")
-                matchs = getCommonConjMatch(matchsL[lidx])
-                #if c == 16:          
-                NonoMatch.printMatchList(matchs)
-                if lidx == 16:
-                    if len(matchs) == 1 :
-#                    if matchs[0][3].mask != "":
-                        print ("")
+                if Debug: NonoMatch.printMatchList(matchs)        
+                printd ("Vs.")
+                matchs = getCommonConjMatch(matchsL[lidx])      
+                if Debug: NonoMatch.printMatchList(matchs)
                 if len(matchs[0]) != len(matchsL[lidx][0]):
                     print ("Assert Error - match len")
 
             if len(matchs) == 1:
                 resState, fullLine, semi = emptyMarkFullEdgesLines(matchs[0],lineState)
                 if fullLine or semi:
-                    print("full match:{0}, semiFull:{1}".format(lidx, fullLine, semi))    
+                    printd("full match:{0}, semiFull:{1}".format(lidx, fullLine, semi))    
                 for i in range(sizeCross):
                     if rowOrCol == RowCol.COL:
                             pzl.updateState(lidx,i,resState[i])
@@ -727,32 +633,42 @@ def solve(pzl):
     count = 0
     while (not pzl.done() and change != 0):
         change = 0
-        ########## Match columns/rows to quiz line parametes #########
+        ########## Match grid line markings to the quiz line parameters (columns/rows)#########
         #         and generate possible match combinations            
-        print ("========Matched Marked rows/cols to Params (All combinations) ===========")
-        pzl.c_match = matchStateToQuizParams( pzl, RowCol.COL)
-        pzl.r_match = matchStateToQuizParams( pzl, RowCol.ROW)
+        printd ("========Fit existing line blocks to the quiz line paramters ===========")
+        printd ("           and generate possible match combinations.")
+        c_match = matchStateToQuizParams( pzl, RowCol.COL)
+        r_match = matchStateToQuizParams( pzl, RowCol.ROW)
+
+        ######### Fill in non-matched (empty) quiz parameters with  #########
+        #          possible free zone placements in the match 
+        #          combinations list.
+        printd ("========Fill in non-matched (empty) quiz parameters with ")
+        printd ("======== possible free zone placements combinations. ===========")
+        c_match = fillEmptyMatchWithFreeZones (pzl, RowCol.COL, c_match)
+        r_match = fillEmptyMatchWithFreeZones (pzl, RowCol.ROW, r_match)
+
 
         ########### Scan Distributions rows/cols ###################
-        print ("========Scan Distributions rows/cols ===========")                
-        pzl.c_match, cdist = scanAxisDist(pzl, RowCol.COL)
-        pzl.r_match, rdist = scanAxisDist(pzl, RowCol.ROW)
-        
+        printd ("========Scan Distributions rows/cols ===========")                
+        cdist = scanAxisDist(pzl, RowCol.COL, c_match)
+        rdist = scanAxisDist(pzl, RowCol.ROW, r_match)
+
         ############# Start Filling According to Distributions ##############
-        print ("===== Start Filling According to Distributions ====") 
+        printd ("===== Start Filling According to Distributions ====") 
         fillByDistribution(pzl,RowCol.COL,cdist)
         fillByDistribution(pzl,RowCol.ROW,rdist)
 
         ############# Start Filling According to Matches##############
-        ## fill in Matched Blanks in col
-        print ("===== Start Filling in incomplete Matched Blocks ====") 
-        fillByMatches(pzl,RowCol.COL )
-        fillByMatches(pzl,RowCol.ROW )
+        ## fill in Matched blocks .
+        printd ("===== Start Filling in Matched Blocks ====") 
+        fillByMatches(pzl,RowCol.COL, c_match )
+        fillByMatches(pzl,RowCol.ROW, r_match )
 
         ############ Search full rows/cols and mark fulls  #############
-        print ("========Mark Full rows/cols===========")        
-        markBlanksInFullLines(pzl, RowCol.COL)
-        markBlanksInFullLines(pzl, RowCol.ROW)
+        printd ("========Mark Blanks in Full rows/cols===========")     
+        markBlanksInFullLines(pzl, RowCol.COL, c_match)
+        markBlanksInFullLines(pzl, RowCol.ROW, r_match)
 
 
         pzl.printState()
@@ -775,7 +691,6 @@ def britStartHints(pzl):
 #
 ############################################################
 def main(argv):
-    global fqz
     global QFILE
 
     inputfile = QFILE
