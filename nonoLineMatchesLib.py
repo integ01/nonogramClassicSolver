@@ -39,10 +39,8 @@ class Match:
         else:
             of="?"
         if  self.end - self.start == 1:
-            #print("#{0}, block:{1}, rangeIdx:{2}".format(self.idx, self.size, self.start))
             return "{0}_qblk:{1}@{2}:{3}({4})".format(self.idx, self.size, self.start, ''.join(self.mask),of)
         else:
-            #print("#{0}, block:{1}, rangeIdx:{2}-{3}".format(self.idx, self.size, self.start, self.end-1))
             return "{0}_qblk:{1}@{2}:{3}({4})".format(self.idx, self.size, self.start, ''.join(self.mask),of)
 
 
@@ -59,15 +57,11 @@ def printd(s):
 def printMatchList(retlist):
     if retlist == []:
         print("[[]]")
-    for matches in retlist: #combPruneList:
-    #    print("============")
-        #print (type(matches))
+    for matches in retlist:
         res = ">"
         for match in matches:
             res += match.print_fields()
             res += ", "
-        #for match in matches:
-        #    match.print_fields()
         print (res)
 
 def Conj(ml1, ml2):
@@ -127,6 +121,27 @@ def mergeMasks(blockMasks):
         prevIdx = blk[0]+blk[1]
     mask = ''.join(mask)
     return (startIdx,endIdx-startIdx, mask)
+
+def compareList(l1,l2):
+   if(len(l1)==len(l2) and len(l1)==sum([1 for i,j in zip(l1,l2) if i==j])):
+      return True
+   else:
+      return False
+
+
+def compareLineDist(dist1, dist2):
+    lsize = 30
+    diff = []
+    for i in range(lsize):
+       if abs (dist1[i] - dist2[i])> 1e-4:
+           diff += [i]
+    if len(diff)>0:
+       print ("<<Unequal distributions:>>")
+       print ("unequal idexes:"+str(diff))
+       print (dist1)
+       print ("----<><>---")
+       print(dist2)
+       print ("<</Unequal distributions:/>>")
 
 
 ##########################################################################
@@ -247,11 +262,9 @@ def genSubGroupsRec(blockMasks, l,res):
 
             
 
-def genSubGroups(blockIdxs, leng):
-    
+def genSubGroups(blockIdxs, leng):   
     base = [ (  (blk[0], blk[1], 'X'*blk[1]) ) for blk in blockIdxs]
     
-
     if (len(blockIdxs) == leng):
         return [base]
     res = genSubGroupsRec(base,leng,[])
@@ -285,11 +298,7 @@ def genCombRec5(qParam,pidx,blockIdxs,minIdx, res):
         if (minIdx > PUZ_DIMY):
             printd ("jumping case minimum end index:({0}) > max index:{1}".format(minIdx,PUZ_DIMY ))
             return []
-        #print (type(matches))
         out = ""
-        #for match in res:
-        #    out += match.print_fields() + ", "
-        #print (out)
         return [res]
     else:
         retList = []
@@ -297,7 +306,6 @@ def genCombRec5(qParam,pidx,blockIdxs,minIdx, res):
         blkStartIdx = blockIdxs[0][0]
             
         for pidx in range(pidx,len(qParam)-len(blockIdxs)+1):  
-
             if qParam[pidx] < blkLen:
                 #print ("jumping case blkLen:{0}, > param len:{1}".format(qParam[pidx],blkLen))
                 continue
@@ -315,79 +323,33 @@ def genCombRec5(qParam,pidx,blockIdxs,minIdx, res):
 
 def genMatches(qParam,lineState):
     global PUZ_DIMY
-    #global combList
-    #combList = []
     PUZ_DIMY = len(lineState)
 
-    #for i in range(1): #//len(Test_lineStates)):
     printd ("Print In:")
     printd (qParam)
-    #lineState = Test_lineStates[1]
     printd (lineState)
     
-    
     blockIdxs = getBlocks(lineState)
-    #print( " start, len")
-    #for block in blockIdxs:
-    #    print (block)
-     
-    #matchQ2Blocks(qParam, blockLine)
-
-    #print ("====Processing  ====")
-
-    #if ( len(blockIdxs) <= len(qParam)):
-    #maxblocks = len(blockIdxs)
-    #print ("maxblocks:" + str(maxblocks))
-
     maxSubLen = min( len(qParam),len(blockIdxs))
     blockMasks = []
     for leng in range(maxSubLen,0,-1):
 	    blockMasks += genSubGroups(blockIdxs, leng)
-    
-    
-    #for block in blockMasks:
-    #    print (block)
-    #    print( "{0}:{1}:{2}".format(block[0], block[1], ''.join(block[2])))
     if maxSubLen == 0:
         finalComb = []
         for i in range(len(qParam)):
             finalComb.append(Match(idx = i, size = qParam[i], start=-1, end= -1, mask="", full=False))
         return [finalComb]
 
-
-
     retlist = []
     for blocks in blockMasks:
         selcomb = genCombRec5(qParam, 0, blocks, 0,[])
- 
-        for combItm in selcomb:
-            
+        for combItm in selcomb:           
             finalComb = []
             for i in range(len(qParam)):
-                finalComb.append(Match(idx = i, size = qParam[i], start=-1, end= -1, mask="", full=False))
-            
+                finalComb.append(Match(idx = i, size = qParam[i], start=-1, end= -1,\
+                 mask="", full=False))          
             for item in combItm:
                 finalComb[item.idx] = item
             retlist += [finalComb]
-
-        #retlist += genCombRec5(qParam, 0, blocks, 0,[])
-
     return retlist
-    #print (retlist)
-
-    #combPruneList = combPruneSize(retlist, blockIdxs)
-    print ("---- Quiz Line: --------")
-    print (qParam)
-    print (lineState)
-    print ("---- Combinations: --------")
-    for matches in retlist: #combPruneList:
-    #    print("============")
-        #print (type(matches))
-        res = ""
-        for match in matches:
-            res += match.print_fields()
-            res += ", "
-        #for match in matches:
-        #    match.print_fields()
-        print (res)
 
