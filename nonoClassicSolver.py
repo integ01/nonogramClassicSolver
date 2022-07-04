@@ -14,6 +14,7 @@ from nonoLineMatchesLib import printd
 import numpy as np
 import sys
 from enum import Enum   
+import argparse
 import pdb
 
 
@@ -23,7 +24,7 @@ DELTA = 0.01
 change = -1 #Number of changes to grid pixels.
 count = 0 #Number of iterations
 
-waitOnStep = True
+
 Debug = False
 
 class RowCol(Enum):
@@ -35,9 +36,10 @@ class RowCol(Enum):
 ################### class puzzleState ##########################
 
 class puzzleState():
-    def __init__(self, hlist=[], vlist=[]):
+    def __init__(self, hlist=[], vlist=[], waitOnStep=True):
         self.hlist = hlist
         self.vlist = vlist
+        self.waitOnStep = waitOnStep
         self.c_size = len(vlist)
         self.r_size = len(hlist)
         self.c_match = {}
@@ -130,6 +132,8 @@ class puzzleState():
                 change += 1
         elif self.state[c][r] != val:
             printd("Dist Error: trying to change Row:{0} Col:{1} from {2} to {3} ".format(r,c, 1-val,val))                   
+            return -1
+        return 0
 
     
     def getLineState(self, idx, rowOrCol):
@@ -139,15 +143,14 @@ class puzzleState():
             return [ self.state[idx][r] for r in range(self.r_size)]            
 
     def iterateStep(self):
-        global waitOnStep
         global change
         global count
 
-        count +=1
+        #count +=1
         print ("iteration#{0}: changes:{1}".format(count,change))
-        if count %1 == 0 and waitOnStep:
+        if count %1 == 0 and self.waitOnStep:
             input("Press any key")
-        if change == 0 and waitOnStep:
+        if change == 0 and self.waitOnStep:
             e = input("edit?")
             if e in "Yy":
                 try: 
@@ -494,30 +497,32 @@ def combDist(distl):
 #  Input: pzl - class puzzleState, 
 #         rowOrCol, data type:class RowCol(Enum)-  fill row or column lines.
 #         distD, data type:Dictionary of lists - list of grid probabilities.
+#  Return: 0 - Success, -1 - puzzle conflict fail.
 ##########################################################################
 def fillByDistribution(pzl, rowOrCol, distD):
         
     size = pzl.r_size if rowOrCol == RowCol.ROW else pzl.c_size
-        
-    #for i in range (size):
+    res = 0  
     for l in distD: 
         distl = distD[l]
-        if len(distl) >0: 
-            lineComb = list(combDist(distl))
-            for j in range (len(lineComb)):
-                stateUpdate = -1
-                if lineComb[j] + DELTA > 1.:
-                    stateUpdate = 1
-                if lineComb[j] - DELTA < 0.:
-                    stateUpdate = 0
-                if (stateUpdate != -1):
-                    if rowOrCol == RowCol.COL:
-                        pzl.updateState(l,j,stateUpdate)
-                    else:
-                        pzl.updateState(j,l,stateUpdate)
-        else:
-            print("Line:{0} #{1} distribution empty".format(rowOrCol,l))           
-
+        if len(distl) == 0: 
+            printd("Line:{0} #{1} distribution empty".format(rowOrCol,l)) 
+            continue
+        lineComb = list(combDist(distl))
+        for j in range (len(lineComb)):
+            stateUpdate = -1
+            if lineComb[j] + DELTA > 1.:
+                stateUpdate = 1
+            if lineComb[j] - DELTA < 0.:
+                stateUpdate = 0
+            if (stateUpdate != -1):
+                if rowOrCol == RowCol.COL:
+                    res = pzl.updateState(l,j,stateUpdate)
+                else:
+                    res = pzl.updateState(j,l,stateUpdate)
+            if res != 0:   break
+                      
+    return res
 
 ##########################################################################
 #  function fillByMatches(): fill block markings witch have blank gaps 
@@ -526,23 +531,23 @@ def fillByDistribution(pzl, rowOrCol, distD):
 #         rowOrCol, data type:class RowCol(Enum)-  scan row or column lines.
 #         matchsL, data type:class Match - list of line matches.
 #  Output - Update puzzle state with markings.
+#  Return: 0 - Success, -1 - puzzle conflict fail.
 ##########################################################################
 def fillByMatches(pzl, rowOrCol, matchsL):               
     ## fill in Matched Blocks 
-    # for col, match in enumerate(self.c_match):
     size = pzl.r_size if rowOrCol == RowCol.ROW else pzl.c_size
-    #matchsL = pzl.r_match if rowOrCol == RowCol.ROW else pzl.c_match
     for lidx in range(size):
             match =  matchsL[lidx]
             if len(match) == 1:
                 for midx, mitm in enumerate(match[0]):
                     blank_indxs = NonoLib.find_blanks(mitm)
-                    for bidx in  blank_indxs:
+                    for bidx in blank_indxs:
                         if rowOrCol == RowCol.COL:
-                            pzl.updateState(lidx,bidx,1)
+                            res = pzl.updateState(lidx,bidx,1)
                         else:
-                            pzl.updateState(bidx,lidx,1)                        
-
+                            res = pzl.updateState(bidx,lidx,1)
+                        if res != 0: return -1
+    return 0
 
 
     ##########################################################################
@@ -554,7 +559,7 @@ def fillByMatches(pzl, rowOrCol, matchsL):
 def solve(pzl):
     global change
     global count
-
+    res = 0 
     count = 0
     while (not pzl.done() and change != 0):
         change = 0
@@ -581,19 +586,23 @@ def solve(pzl):
 
         ############# Start Filling According to Distributions ##############
         printd ("===== Start Filling According to Distributions ====") 
-        fillByDistribution(pzl,RowCol.COL,cdist)
-        fillByDistribution(pzl,RowCol.ROW,rdist)
-
+        res = fillByDistribution(pzl,RowCol.COL,cdist)
+        if res != 0: break
+        res = fillByDistribution(pzl,RowCol.ROW,rdist)
+        if res != 0: break
         ############# Start Filling According to Matches##############
         ## fill in Matched blocks .
         printd ("===== Start Filling in Matched Blocks ====") 
-        fillByMatches(pzl,RowCol.COL, c_match )
-        fillByMatches(pzl,RowCol.ROW, r_match )
+        res = fillByMatches(pzl,RowCol.COL, c_match )
+        if res != 0: break
+        res = fillByMatches(pzl,RowCol.ROW, r_match )
+        if res != 0: break
 
-
-        pzl.printState()
-        pzl.iterateStep()
-
+        count +=1
+        if pzl.waitOnStep: 
+          pzl.printState()
+          pzl.iterateStep()
+    return res, pzl.done(), change
 #########################        
 # britStartHints - an example of setting start marking hints
 #
@@ -628,9 +637,24 @@ def main(argv):
     #britStartHints(pzl)   #an example of setting start markings.
     pzl.printState()
 
-    solve(pzl)
+    res, done, numChanges = solve(pzl)
     pzl.printState()
-
+    print ("Puzzle res:{}, Done:{}, last number of changes:{}".format(res, done, numChanges))
+    if res == 0:
+       if  done:
+         print ("Puzzle Succesfully Solved!")
+       elif numChanges == 0:
+         print ("Puzzle Not Completed, (possibly more than one solution")
+       else:
+          print ("Puzzle Not Completed, unexpected result")
+    else:
+       print ("Puzzle Not Completed, conflict in definition")
+    
 
 if __name__ == "__main__":
+
     main(sys.argv[1:])
+
+
+
+
