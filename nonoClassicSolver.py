@@ -80,7 +80,8 @@ class puzzleState():
                 else:
                     linestr += " , "
             print(linestr)
-        print (linespace + "-----------------------------")
+        linebar = '-'*self.c_size
+        print (linespace + linebar)
 
 
         for j in range(self.r_size):
@@ -616,7 +617,8 @@ def britStartHints(pzl):
 
 ############################################################
 #                            main
-# argument - input file (csv), see example file for format
+# usage: nonoClassicSolver.py [input file (csv)]
+#        default input: QFILE, see example file for format
 #
 ############################################################
 def main(argv):
