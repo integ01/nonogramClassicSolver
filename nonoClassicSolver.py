@@ -1,12 +1,27 @@
-###########################################################\
 #
-#  NonoGram solver based on classic puzzle solving: iteratively 
-#  applying 'rules' over the nono-grid to find locations that 
-#  can be marked. The are three possible states to each grid 
-#  point: marked ('X'), Non mark ('.'), Empty ('_')
-#  The end result of a solved puzzle should include only marked or
-#  non-marked points signifying the color blocks of the nonoGram
-#  image.   
+#     Copyright (C) 2022 Benny Shimony
+#
+#     This file is part of nonogramClassicSolver.
+#
+#    nonogramClassicSolver is free software: you can redistribute it and/or modify it under
+#    the terms of the GNU General Public License as published by the Free Software Foundation,
+#    either version 3 of the License, or (at your option) any later version.
+#
+#    nonogramClassicSolver is distributed in the hope that it will be useful, but 
+#    WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS 
+#    FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License along with Foobar. 
+#    If not, see <https://www.gnu.org/licenses/>. 
+#
+#
+#    NonoGram solver based on classic puzzle solving: iteratively 
+#    applying 'rules' over the nono-grid to find locations that 
+#    can be marked. The are three possible states to each grid 
+#    point: marked ('X'), Non mark ('.'), Empty ('_')
+#    The end result of a solved puzzle should include only marked or
+#    non-marked points signifying the color blocks of the nonoGram
+#    image.   
 #  
 
 import nonoLineMatchesLib as NonoLib
@@ -149,7 +164,7 @@ class puzzleState():
 
         #count +=1
         print ("iteration#{0}: changes:{1}".format(count,change))
-        if count %1 == 0 and self.waitOnStep:
+        if self.waitOnStep:  
             input("Press any key")
         if change == 0 and self.waitOnStep:
             e = input("edit?")
@@ -195,11 +210,11 @@ def findHiLowRange(lineState,low , hi):
 # function getLineDistMatch(): Basic calculation for a quiz line's placement 
 #  distribution.
 #
-# Input: ‘qParams’ - Is the quiz line parameters (l_1..l_k) list .
-#        ‘mRanges’ - are a list of tuples  (startIdx ,move) - which correspond to each 
+# Input: 'qParams' - Is the quiz line parameters (l_1..l_k) list.
+#        'mRanges' - are a list of tuples  (startIdx ,move) - which correspond to each 
 #                    qParams item (l_1..l_k) and define line block start-index location and 
 #                    its possible maximal move (or shift) in the grid.
-#        ‘lsize’ - Is the size of the grid line.
+#        'lsize' - Is the size of the grid line.
 # Return: 
 #        dist - list of lists of line distributions.
 ############################################################################
@@ -238,11 +253,11 @@ def getLineDistMatch(qParams, mRanges, lsize):
 # function getLineDistMatch2(): Another calculation for a quiz line's placement 
 # distribution (for reference purposes).
 #
-# Input: ‘qParams’ - Is the quiz line parameters (l_1..l_k) list .
-#        ‘mRanges’ - are a list of tuples  (startIdx ,move) - which correspond to each 
+# Input: 'qParams' - Is the quiz line parameters (l_1..l_k) list .
+#        'mRanges' - are a list of tuples  (startIdx ,move) - which correspond to each 
 #                    qParams item (l_1..l_k) and define line block start-index location and 
 #                    its possible maximal move (or shift) in the grid.
-#        ‘lsize’ - Is the size of the grid line.
+#        'lsize' - Is the size of the grid line.
 # Return: 
 #        dist - list of lists of line distributions.
 ##############################################################################   
@@ -284,9 +299,9 @@ def getLineDistMatch2( qParams, mRanges, lsize):
 #   finds the sub-ranges of `uncertain' locations of blocks, and prepares list 
 #   for each of the quiz blocks (line parameters), where it can be placed. 
 #  Inputs: 
-#    ‘matchl’ - is the list of list of matches found for the line.
-#    ‘lineState’ - is puzzle line state with existing marking.
-#    ‘gQParam’ - is quiz line parameters.
+#    'matchl' - is the list of list of matches found for the line.
+#    'lineState' - is puzzle line state with existing marking.
+#    'gQParam' - is quiz line parameters.
 #  Returns:
 #   A list of tuples (startIdx ,move) which correspond to each of the quiz 
 #   parameter items (l_1..l_k) .
@@ -493,8 +508,8 @@ def combDist(distl):
 ##########################################################################
 #  function fillByDistribution(): Start filling the puzzle grid, 
 #    according to line distributions. 
-#  Each location with probability ‘1.0’ is a candidate to be ‘marked-full’.
-#  Each location with probability ‘0.0’ zero is a candidate to be ‘marked-blank’.
+#  Each location with probability '1.0' is a candidate to be 'marked-full'.
+#  Each location with probability '0.0' zero is a candidate to be 'marked-blank'.
 #  Input: pzl - class puzzleState, 
 #         rowOrCol, data type:class RowCol(Enum)-  fill row or column lines.
 #         distD, data type:Dictionary of lists - list of grid probabilities.
@@ -646,7 +661,7 @@ def main(argv):
        if  done:
          print ("Puzzle Succesfully Solved!")
        elif numChanges == 0:
-         print ("Puzzle Not Completed, (possibly more than one solution")
+         print ("Puzzle Not Completed, (possibly more than one solution)")
        else:
           print ("Puzzle Not Completed, unexpected result")
     else:

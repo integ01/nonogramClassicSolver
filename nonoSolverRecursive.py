@@ -1,15 +1,30 @@
-
-
+#
+#     Copyright (C) 2022 Benny Shimony
+#
+#     This file is part of nonogramClassicSolver.
+#
+#    nonogramClassicSolver is free software: you can redistribute it and/or modify it under
+#    the terms of the GNU General Public License as published by the Free Software Foundation,
+#    either version 3 of the License, or (at your option) any later version.
+#
+#    nonogramClassicSolver is distributed in the hope that it will be useful, but 
+#    WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS 
+#    FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License along with Foobar. 
+#    If not, see <https://www.gnu.org/licenses/>. 
+#
 import argparse
 import sys, getopt
 import nonoLineMatchesLib as NonoLib
 import copy
+import os
 from os import walk
 import shutil
 from nonoClassicSolver import *
 
 
-BASE_PATH= "../"
+BASE_PATH= ""
 QFILE = "../Q-Multi.csv"
 FLAGS = None
 MAX_GUESS = 2
@@ -140,7 +155,7 @@ def solveQuizSet(qpath,dstPath):
               print(fl + " has single solution")
               solSingle.append((fl,sol))
     
-    pdb.set_trace()
+    #pdb.set_trace()
     def insertPic(name, index): return name[:index+1] + 'Pic' + name[index+1:]
     
     for it in solSingle: 
@@ -150,7 +165,7 @@ def solveQuizSet(qpath,dstPath):
 
 ############################################################
 #                            main
-# usage: nonoSolverRecursive.py [-h] [--quiz QFile] [--depth N]
+# usage: nonoSolverRecursive.py [-h] [--qfile QFile] [--depth N]
 #                              [--basepath BASEPATH] [--qdir QDIR]
 #                              [--ddir DDIR]
 # uses global FLAGS for parameters.
@@ -167,16 +182,16 @@ def main():
   print ('Max search depth:'+str(FLAGS.depth)) 
 
   if FLAGS.qdir:
-    qpath = basepath+FLAGS.qdir
+    qpath = os.path.join(basepath, FLAGS.qdir)
     if FLAGS.ddir:
-      dstPath=basepath+FLAGS.ddir
+      dstPath= os.path.join(basepath, FLAGS.ddir)
     else:
-      dstPath = basepath+'nonoGramTrainSingleSol'
+      dstPath = os.path.join(basepath, 'nonoGramTrainSingleSol')
     print ('Input Quiz Path: '+ qpath)
     print ('Dest Quiz Path: '+ dstPath)
     solveQuizSet(qpath,dstPath)
-  elif len(FLAGS.quiz)>0:
-    inputfile = FLAGS.quiz
+  elif len(FLAGS.qfile)>0:
+    inputfile = FLAGS.qfile
     solveQuiz(inputfile)
   else:
      inputfile = QFILE
@@ -185,12 +200,12 @@ def main():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Recursive Nono Classic Sovler') 
-    parser.add_argument('--quiz', type=str, default='', metavar='QFile',  help='file name for the quiz file.')
+    parser.add_argument('--qfile', type=str, default='', metavar='QFile',  help='file name for the quiz file.')
     parser.add_argument('--depth', type=int, default=10, metavar='N', help='max recursive depth of search')
     parser.add_argument('--basepath', type=str, default='', help='base path for quiz directories')
 
-    parser.add_argument('--qdir', type=str, default='', help='quiz directory Q- files.')
-    parser.add_argument('--ddir', type=str, default='', help='destination directory for filtered quizes with a single solution.')
+    parser.add_argument('--qdir', type=str, default='', help='quiz directory for solving multi quiz set of files.')
+    parser.add_argument('--ddir', type=str, default='', help='destination directory for storing result quizes with a single solution.')
 
     FLAGS, unparsed = parser.parse_known_args()
 
