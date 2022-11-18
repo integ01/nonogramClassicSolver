@@ -22,6 +22,7 @@ import os
 from os import walk
 import shutil
 from nonoClassicSolver import *
+import nonoGenLib as nonoGen
 
 
 BASE_PATH= ""
@@ -155,7 +156,7 @@ def solveQuizSet(qpath,dstPath):
               print(fl + " has single solution")
               solSingle.append((fl,sol))
     
-    #pdb.set_trace()
+
     def insertPic(name, index): return name[:index+1] + 'Pic' + name[index+1:]
     
     for it in solSingle: 
@@ -165,16 +166,33 @@ def solveQuizSet(qpath,dstPath):
 
 ############################################################
 #                            main
-# usage: nonoSolverRecursive.py [-h] [--qfile QFile] [--depth N]
+# usage: nonoSolverRecursive.py [-h] [--qfile QFile] [--depth DEPTH]
 #                              [--basepath BASEPATH] [--qdir QDIR]
-#                              [--ddir DDIR]
+#                              [--ddir DDIR] [--gen N] [--gen-dim DIM]
+#
+# Generate and Sort Solution using a Recursive Nono Classic Solver
+#
+# optional arguments:
+#  -h, --help           show this help message and exit
+#  --qfile QFile        file name for the quiz file.
+#  --depth DEPTH        max recursive depth of search
+#  --basepath BASEPATH  base path for quiz directories
+#  --qdir QDIR          quiz directory for solving multi quiz set of files.
+#  --ddir DDIR          destination directory for storing result quizes with a
+#                       single solution.
+#  --gen N              generate N random nonogram quizes and store them in the
+#                       `qdir` directory path.
+#  --gen-dim DIM        dimension (DIMxDIM) of nonogram quizes to generate.
+#
 # uses global FLAGS for parameters.
 ############################################################
+
 def main():
   global QFILE
   global FLAGS
   global BASE_PATH
-
+  N = 0
+  dim = 10
   basepath= BASE_PATH 
   if FLAGS.basepath:
      basepath = FLAGS.basepath
@@ -189,6 +207,22 @@ def main():
       dstPath = os.path.join(basepath, 'nonoGramTrainSingleSol')
     print ('Input Quiz Path: '+ qpath)
     print ('Dest Quiz Path: '+ dstPath)
+
+    if not os.path.exists(qpath):
+        print ("path:'{}' does not exist, please create it first.".format(qpath))
+        return
+    if not os.path.exists(dstPath):
+        print ("destination path:'{}' does not exist, please create it first.".format(dstPath))
+        return
+
+    if FLAGS.gen:
+      N = FLAGS.gen
+      if FLAGS.gen_dim:
+        dim = FLAGS.gen_dim
+      print ("Generating {} puzzles of dimension:{}x{} in the input path:{}".format(N,dim,dim,qpath))
+      nonoGen.genQuizSet(qpath,N,dim)
+
+    print ("Solving and Sorting Solutions of puzzles to desination path:'{}'".format(dstPath))
     solveQuizSet(qpath,dstPath)
   elif len(FLAGS.qfile)>0:
     inputfile = FLAGS.qfile
@@ -199,14 +233,17 @@ def main():
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Recursive Nono Classic Sovler') 
+    parser = argparse.ArgumentParser(description='Generate and Sort Solution using a Recursive Nono Classic Solver') 
     parser.add_argument('--qfile', type=str, default='', metavar='QFile',  help='file name for the quiz file.')
-    parser.add_argument('--depth', type=int, default=10, metavar='N', help='max recursive depth of search')
+    parser.add_argument('--depth', type=int, default=10, help='max recursive depth of search')
     parser.add_argument('--basepath', type=str, default='', help='base path for quiz directories')
 
     parser.add_argument('--qdir', type=str, default='', help='quiz directory for solving multi quiz set of files.')
     parser.add_argument('--ddir', type=str, default='', help='destination directory for storing result quizes with a single solution.')
 
+    parser.add_argument('--gen', type=int, default=100, metavar='N', help='generate N random nonogram quizes and store them in the `qdir` directory path.')
+
+    parser.add_argument('--gen-dim', type=int, default=10, metavar='DIM', help='dimension (DIMxDIM) of nonogram quizes to generate.')
     FLAGS, unparsed = parser.parse_known_args()
 
     main()
